@@ -1,39 +1,44 @@
 defmodule Statix do
   defmacro __using__(_opts) do
     quote location: :keep do
-      {host, port, prefix} = Statix.config(__MODULE__)
-      conn = Statix.Conn.new(host, port)
-      header = [conn.header | prefix]
-      @statix_conn %{conn | header: header, sock: __MODULE__}
 
       def connect() do
-        conn = Statix.Conn.open(@statix_conn)
+        {host, port, prefix} = Statix.config(__MODULE__)
+        conn = Statix.Conn.new(host, port)
+        header = [conn.header | prefix]
+        conn = %{conn | header: header, sock: __MODULE__}
+        conn = Statix.Conn.open(conn)
+        Application.put_env(:statix, :conn, conn)
         Process.register(conn.sock, __MODULE__)
         :ok
       end
 
+      defp current_conn do
+        Application.fetch_env!(:statix, :conn)
+      end
+
       def increment(key, val \\ "1") do
-        @statix_conn
+        current_conn
         |> Statix.transmit(:counter, key, val)
       end
 
       def decrement(key, val \\ "1") do
-        @statix_conn
+        current_conn
         |> Statix.transmit(:counter, key, [?-, to_string(val)])
       end
 
       def gauge(key, val) do
-        @statix_conn
+        current_conn
         |> Statix.transmit(:gauge, key, val)
       end
 
       def histogram(key, val) do
-        @statix_conn
+        current_conn
         |> Statix.transmit(:histogram, key, val)
       end
 
       def timing(key, val) do
-        @statix_conn
+        current_conn
         |> Statix.transmit(:timing, key, val)
       end
 
@@ -54,7 +59,7 @@ defmodule Statix do
       end
 
       def set(key, val) do
-        @statix_conn
+        current_conn
         |> Statix.transmit(:set, key, val)
       end
     end
